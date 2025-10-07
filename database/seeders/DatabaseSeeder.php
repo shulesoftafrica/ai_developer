@@ -113,7 +113,7 @@ class TaskSeeder extends Seeder
                 'sprint_id' => $activeSprint->id,
                 'uuid' => (string) Str::uuid(),
                 'title' => 'Implement User Authentication System',
-                'description' => 'Create a complete portifolio system with user authentication to admin with registration, login, password reset, and email verification functionality and other functionalities. consider using Laravel 12.',
+                'description' => 'Create a complete portifolio Laravel system with user authentication to admin with registration, login, password reset, and email verification functionality and other portifolio functionalities. consider using Laravel 12.',
                 'type' => TaskType::FEATURE,
                 'status' => TaskStatus::PENDING,
                 'priority' => 1,

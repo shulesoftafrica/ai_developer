@@ -9,6 +9,7 @@
         "guzzlehttp/guzzle": "^7.5",
         "laravel/framework": "^10.0",
         "laravel/tinker": "^2.10",
+        "predis/predis": "^3.2",
         "symfony/console": "^6.4"
     },
     "require-dev": {

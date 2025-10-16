@@ -215,7 +215,7 @@ class FilePatcher
         return str_replace($after, $after . "\n" . $insertContent, $content);
     }
 
-    public function listFiles(string $relativePath = '', array $extensions = null): array
+    public function listFiles(string $relativePath = '', array $extensions = []): array
     {
         $fullPath = $this->getSecurePath($relativePath);
         $extensions = $extensions ?? $this->allowedExtensions;

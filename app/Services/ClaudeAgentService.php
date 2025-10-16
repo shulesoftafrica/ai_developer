@@ -30,7 +30,7 @@ class ClaudeAgentService
             'anthropic-version' => env('ANTHROPIC_VERSION'),
         ])->withOptions([
             'stream' => true,
-            'timeout' => 300, // increase for big plans
+            'timeout' => 3000, // increase for big plans
         ])->post($url, [
             'model' => $this->model,
             'max_tokens' => 40000,
@@ -171,9 +171,119 @@ Context: {$context}";
 
 
     /**
+     * Get a structured test plan from Claude
+     */
+    public function getTestPlan(string $context): array
+    {
+        $prompt = "Create comprehensive testing features and unit tests based on the provided context.
+Respond with JSON only containing a list of programming language-style actions for creating test files.
+
+Example format:
+{
+    \"actions\": [
+        {
+            \"action\": \"create_folder\",
+            \"path\": \"tests/Unit\"
+        },
+        {
+            \"action\": \"create_file\",
+            \"path\": \"tests/Unit/ExampleTest.php\",
+            \"content\": \"<?php\n\nnamespace Tests\\Unit;\n\nuse PHPUnit\\Framework\\TestCase;\n\nclass ExampleTest extends TestCase\n{\n    public function test_example()\n    {\n        \$this->assertTrue(true);\n    }\n}\"
+        },
+        {
+            \"action\": \"create_file\",
+            \"path\": \"tests/Feature/ExampleFeatureTest.php\",
+            \"content\": \"<?php\n\nnamespace Tests\\Feature;\n\nuse Tests\\TestCase;\n\nclass ExampleFeatureTest extends TestCase\n{\n    public function test_example_feature()\n    {\n        \$response = \$this->get('/');\n\n        \$response->assertStatus(200);\n    }\n}\"
+        }
+    ]
+}
+
+IMPORTANT:
+- For create_file actions, always include complete, functioning test code
+- Use appropriate testing frameworks and conventions for the detected programming language
+- Create unit tests, integration tests, and feature tests as needed
+- Follow language-specific testing best practices and naming conventions
+- Include realistic test cases that would actually validate the implemented functionality
+- Generate proper test data, mocks, and fixtures when needed
+
+Respond with raw JSON only. Do not include Markdown fences, explanations, or extra text.
+
+Context: {$context}";
+
+        // Get the extracted text from streaming response
+        $jsonString = trim($this->callClaude($prompt));
+
+        if (empty($jsonString)) {
+            Log::warning("No content received from Claude streaming response for test plan");
+            return [];
+        }
+
+        // Check if JSON appears to be truncated (doesn't end with closing brace)
+        $lastChar = substr($jsonString, -1);
+        if ($lastChar !== '}') {
+            Log::warning("Test plan JSON appears to be truncated, attempting to fix", ['last_char' => $lastChar, 'json_length' => strlen($jsonString)]);
+
+            // Try to find the last complete JSON object by counting braces
+            $braceCount = 0;
+            $lastValidPos = -1;
+            $inString = false;
+            $escapeNext = false;
+
+            for ($i = 0; $i < strlen($jsonString); $i++) {
+                $char = $jsonString[$i];
+
+                if ($escapeNext) {
+                    $escapeNext = false;
+                    continue;
+                }
+
+                if ($char === '\\') {
+                    $escapeNext = true;
+                    continue;
+                }
+
+                if ($char === '"' && !$escapeNext) {
+                    $inString = !$inString;
+                    continue;
+                }
+
+                if (!$inString) {
+                    if ($char === '{') {
+                        $braceCount++;
+                    } elseif ($char === '}') {
+                        $braceCount--;
+                        if ($braceCount === 0) {
+                            $lastValidPos = $i;
+                        }
+                    }
+                }
+            }
+
+            if ($lastValidPos > 0 && $braceCount === 0) {
+                $jsonString = substr($jsonString, 0, $lastValidPos + 1);
+                Log::info("Trimmed test plan JSON to last complete object", ['new_length' => strlen($jsonString)]);
+            } elseif ($braceCount > 0) {
+                // Try to close unclosed braces
+                $jsonString .= str_repeat('}', $braceCount);
+                Log::info("Added missing closing braces to test plan", ['braces_added' => $braceCount]);
+            }
+        }
+
+        // Decode JSON directly
+        $json = json_decode($jsonString, true);
+        if (!$json || !isset($json['actions'])) {
+            Log::warning("Failed to decode test plan JSON", ['json' => substr($jsonString, 0, 500) . (strlen($jsonString) > 500 ? '... (truncated)' : '')]);
+            return [];
+        }
+
+        Log::info('Successfully parsed test plan', ['actions_count' => count($json['actions'])]);
+
+        return $json['actions'];
+    }
+
+    /**
      * Execute the structured plan safely
      */
-
     public function executePlan(array $actions): array
     {
         $results = [];
@@ -395,13 +505,13 @@ Context: {$context}";
         $pathInfo = pathinfo($path);
         $extension = $pathInfo['extension'] ?? '';
         $filename = $pathInfo['filename'] ?? 'Unknown';
-        
+
         if ($extension === 'php') {
             // Determine namespace and class name from path
             $relativePath = str_replace($this->workspace . '/', '', $path);
             $namespace = '';
             $className = $filename;
-            
+
             if (strpos($relativePath, 'app/') === 0) {
                 $namespace = 'App';
                 $parts = explode('/', dirname(substr($relativePath, 4)));
@@ -410,12 +520,12 @@ Context: {$context}";
                     $namespace .= '\\' . implode('\\', $parts);
                 }
             }
-            
+
             $stub = "<?php\n\n";
             if ($namespace) {
                 $stub .= "namespace {$namespace};\n\n";
             }
-            
+
             // Determine class type based on path
             if (strpos($relativePath, 'app/Models/') === 0) {
                 $stub .= "use Illuminate\\Database\\Eloquent\\Model;\n\n";
@@ -438,14 +548,14 @@ Context: {$context}";
             } else {
                 $stub .= "class {$className}\n{\n    //\n}\n";
             }
-            
+
             return $stub;
         }
-        
+
         if (str_contains($path, '.blade.php')) {
             return "<h1>Generated View</h1>\n<p>This is a placeholder view.</p>";
         }
-        
+
         return "// Generated file: {$path}\n";
     }
 }

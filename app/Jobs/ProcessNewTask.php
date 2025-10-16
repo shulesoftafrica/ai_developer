@@ -883,6 +883,7 @@ class ProcessNewTask implements ShouldQueue
                 $context .= "Create a structured plan to implement this task as PHP code.\n";
                 $context .= "Focus on creating clean, maintainable code following PHP best practices.\n";
                 $context .= $default_pattern;
+                $context .= "Before creating a file check if it exists, if exists, create a replace especial in migrations folder\n";
                 $context .= "Follow PSR-12 coding standards and PHP best practices.\n";
                 break;
 
@@ -890,6 +891,7 @@ class ProcessNewTask implements ShouldQueue
                 $context .= "Create a structured plan to implement this task as PHP/Laravel code.\n";
                 $context .= "Focus on creating clean, maintainable code following Laravel conventions.\n";
                 $context .= $default_pattern;
+                $context .= "Before creating a file check if it exists, if exists, create a replace especial in migrations folder\n";
                 $context .= "Follow PSR-12 coding standards and Laravel best practices.\n";
                 break;
 

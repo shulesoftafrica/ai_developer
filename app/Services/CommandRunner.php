@@ -121,8 +121,22 @@ class CommandRunner
 
         // Generate phpunit.xml if it does not exist
         if (!file_exists($phpunitConfigPath) && !file_exists($phpunitDistConfigPath)) {
-            Log::info('phpunit.xml not found, generating default configuration');
-            $this->run('vendor/bin/phpunit', ['--generate-configuration']);
+            Log::info('phpunit.xml not found, creating default configuration');
+            $defaultConfig = <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true">
+    <testsuites>
+        <testsuite name="Test Suite">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
+XML;
+            file_put_contents($phpunitConfigPath, $defaultConfig);
+            Log::info('Created default phpunit.xml');
         }
 
         // PHP project with PHPUnit
